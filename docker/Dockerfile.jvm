@@ -16,6 +16,10 @@ RUN mvn clean package -DskipTests
 # Stage 2: Create a minimal, secure runtime image
 FROM eclipse-temurin:17-jre-alpine
 
+# Security Patch: Upgrade base OS packages to fix Trivy vulnerabilities (e.g., CVE-2026-33845 in gnutls)
+RUN apk update && apk upgrade --no-cache
+
+
 # Security: Create a non-root user and group with UID/GID 1000
 RUN addgroup -g 1000 appgroup && \
     adduser -u 1000 -G appgroup -s /bin/sh -D appuser
