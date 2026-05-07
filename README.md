@@ -21,7 +21,7 @@ If you want to run this simulation on your own PC, you will need the following d
 
 1. **Clone the repository:**
    ```bash
-   git clone <your-repo-url>
+   git clone https://github.com/RiOxFRANKY/Kerberos-Simulation.git
    cd Kerberos-Simulation
    ```
 
