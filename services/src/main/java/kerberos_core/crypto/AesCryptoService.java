@@ -5,7 +5,7 @@ import javax.crypto.KeyGenerator;
 import javax.crypto.Mac;
 import javax.crypto.SecretKey;
 import javax.crypto.SecretKeyFactory;
-import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.security.MessageDigest;
@@ -20,7 +20,7 @@ import java.util.Base64;
 public class AesCryptoService implements CryptoOperations {
 
     private static final String AES_ALGORITHM = "AES";
-    private static final String CIPHER_TRANSFORMATION = "AES/CBC/PKCS5Padding";
+    private static final String CIPHER_TRANSFORMATION = "AES/GCM/NoPadding";
     private static final String HMAC_ALGORITHM = "HmacSHA256";
     private static final String KDF_ALGORITHM = "PBKDF2WithHmacSHA256";
     private static final int AES_KEY_SIZE = 256;
@@ -39,8 +39,8 @@ public class AesCryptoService implements CryptoOperations {
     public byte[] encrypt(byte[] data, byte[] key, byte[] iv) throws Exception {
         Cipher cipher = Cipher.getInstance(CIPHER_TRANSFORMATION);
         SecretKeySpec keySpec = new SecretKeySpec(key, AES_ALGORITHM);
-        IvParameterSpec ivSpec = new IvParameterSpec(iv);
-        cipher.init(Cipher.ENCRYPT_MODE, keySpec, ivSpec);
+        GCMParameterSpec gcmSpec = new GCMParameterSpec(128, iv);
+        cipher.init(Cipher.ENCRYPT_MODE, keySpec, gcmSpec);
         return cipher.doFinal(data);
     }
 
@@ -48,8 +48,8 @@ public class AesCryptoService implements CryptoOperations {
     public byte[] decrypt(byte[] encryptedData, byte[] key, byte[] iv) throws Exception {
         Cipher cipher = Cipher.getInstance(CIPHER_TRANSFORMATION);
         SecretKeySpec keySpec = new SecretKeySpec(key, AES_ALGORITHM);
-        IvParameterSpec ivSpec = new IvParameterSpec(iv);
-        cipher.init(Cipher.DECRYPT_MODE, keySpec, ivSpec);
+        GCMParameterSpec gcmSpec = new GCMParameterSpec(128, iv);
+        cipher.init(Cipher.DECRYPT_MODE, keySpec, gcmSpec);
         return cipher.doFinal(encryptedData);
     }
 

@@ -57,3 +57,6 @@ logs/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# scripts
+*.ps1
