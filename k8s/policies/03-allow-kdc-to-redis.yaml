@@ -1,0 +1,47 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-kdc-to-redis
+spec:
+  # Target the Redis pod
+  podSelector:
+    matchLabels:
+      app: redis
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    # Allow incoming traffic exclusively from AS and TGS pods
+    - podSelector:
+        matchLabels:
+          app: kerberos-tgs
+    - podSelector:
+        matchLabels:
+          app: kerberos-as
+    ports:
+    - protocol: TCP
+      port: 6379
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-kdc-egress-to-redis
+spec:
+  # Target the AS and TGS pods to allow outbound Egress to Redis
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values:
+          - kerberos-as
+          - kerberos-tgs
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: redis
+    ports:
+    - protocol: TCP
+      port: 6379

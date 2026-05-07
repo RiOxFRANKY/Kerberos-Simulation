@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: kdc-db
+  labels:
+    app: kdc-db
+spec:
+  serviceName: kdc-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kdc-db
+  template:
+    metadata:
+      labels:
+        app: kdc-db
+    spec:
+      containers:
+      - name: kdc-db
+        image: postgres:16-alpine
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: kdc-db-secrets
+              key: PG_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kdc-db-secrets
+              key: PG_PASSWORD
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: kdc-db-secrets
+              key: PG_DATABASE
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+        volumeMounts:
+        - name: kdc-db-storage
+          mountPath: /var/lib/postgresql/data
+        readinessProbe:
+          exec:
+            command: ["pg_isready", "-U", "$(POSTGRES_USER)", "-d", "$(POSTGRES_DB)"]
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          exec:
+            command: ["pg_isready", "-U", "$(POSTGRES_USER)", "-d", "$(POSTGRES_DB)"]
+          initialDelaySeconds: 15
+          periodSeconds: 20
+  volumeClaimTemplates:
+  - metadata:
+      name: kdc-db-storage
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kdc-db
+spec:
+  type: LoadBalancer
+  selector:
+    app: kdc-db
+  ports:
+    - protocol: TCP
+      port: 5432
+      targetPort: 5432

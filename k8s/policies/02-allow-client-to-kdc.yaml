@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-client-to-kdc
+spec:
+  # Target the AS and TGS pods
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values:
+          - kerberos-as
+          - kerberos-tgs
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    # Only allow traffic originating from the 'client' namespace
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: client
+    ports:
+    - protocol: TCP
+      port: 8080

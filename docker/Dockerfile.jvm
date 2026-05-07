@@ -1,0 +1,39 @@
+# Stage 1: Build the application using Maven
+FROM maven:3.9.6-eclipse-temurin-17 AS build
+WORKDIR /project
+
+# Copy the source code into the container
+COPY . /project/
+
+# Move into the services directory where the parent pom.xml is located
+WORKDIR /project/services
+
+# Run the Maven build
+# Note: This assumes the Maven structure (src/main/java and sub-module poms) 
+# is fixed before building, as standard Maven requires them to compile successfully.
+RUN mvn clean package -DskipTests
+
+# Stage 2: Create a minimal, secure runtime image
+FROM eclipse-temurin:17-jre-alpine
+
+# Security: Create a non-root user and group with UID/GID 1000
+RUN addgroup -g 1000 appgroup && \
+    adduser -u 1000 -G appgroup -s /bin/sh -D appuser
+
+# Set working directory and ownership
+WORKDIR /app
+RUN chown -R appuser:appgroup /app
+
+# Switch to the non-root user
+USER 1000
+
+# Copy the Quarkus fast-jar output from the build stage
+# Assuming the build generates the standard Quarkus output in 'target/quarkus-app'
+# If building a specific microservice, adjust the path (e.g., kerberos-as/target/quarkus-app/)
+COPY --from=build --chown=appuser:appgroup /project/services/target/quarkus-app/ /app/
+
+# Expose the standard Quarkus HTTP port
+EXPOSE 8080
+
+# Start the Quarkus application
+CMD ["java", "-jar", "quarkus-run.jar"]

@@ -1,0 +1,99 @@
+name: DevSecOps Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  # 1. Run Unit Tests
+  build-and-test:
+    name: Unit Testing (Maven)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+          
+      - name: Run Unit Tests
+        working-directory: ./services
+        # Runs the standard tests. Adjust if tests are skipped or disabled in pom.xml.
+        run: mvn test
+
+  # 2. Run SAST Scan using Semgrep
+  sast-scan:
+    name: Semgrep SAST Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Semgrep Security Scan
+        uses: returntocorp/semgrep-action@v1
+        with:
+          # Use standard Java security rules
+          config: "p/java"
+
+  # 3 & 4. Build Images & Run Trivy Container Scanning
+  container-security:
+    name: Container Build & Scan
+    runs-on: ubuntu-latest
+    # Only proceed to container build if the code compiles, tests pass, and SAST is clean
+    needs: [build-and-test, sast-scan]
+    strategy:
+      matrix:
+        # Array of our three microservices
+        service: [kerberos-as, kerberos-tgs, app-service]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker Image
+        # Uses the shared Dockerfile in the root context
+        run: |
+          docker build -t kerberos-simulation/${{ matrix.service }}:${{ github.sha }} -f docker/Dockerfile.jvm .
+
+      - name: Run Trivy Vulnerability Scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'kerberos-simulation/${{ matrix.service }}:${{ github.sha }}'
+          format: 'table'
+          # CRITICAL: If Trivy finds vulnerabilities matching the severity, return exit code 1 to intentionally FAIL the job
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          # We only want to block the pipeline on CRITICAL vulnerabilities
+          severity: 'CRITICAL'
+
+  # 5. Terraform Infrastructure Deployment (Test)
+  terraform-deploy:
+    name: Terraform Local K8s Deploy
+    runs-on: ubuntu-latest
+    # Strictly requires the container-security job (Trivy Scan) to pass successfully
+    needs: [container-security]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Execution Gate Passed
+        run: |
+          echo "✅ All tests passed!"
+          echo "✅ Semgrep SAST scan passed!"
+          echo "✅ Trivy Container Security scan passed with ZERO CRITICAL vulnerabilities!"
+          echo "🚀 Proceeding to test Terraform deployment..."
+          
+      - name: Create k8s Kind Cluster
+        uses: helm/kind-action@v1.8.0
+        # This action creates a local Kubernetes cluster and automatically configures ~/.kube/config for the runner
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve

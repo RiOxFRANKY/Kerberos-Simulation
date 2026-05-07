@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kdc-store
+  labels:
+    app: kdc-store
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kdc-store
+  template:
+    metadata:
+      labels:
+        app: kdc-store
+    spec:
+      containers:
+      - name: kdc-store
+        image: redis:7.2-alpine
+        # Launch Redis with password authentication using the secret
+        command: ["redis-server"]
+        args: ["--requirepass", "$(REDIS_PASSWORD)"]
+        env:
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kerberos-secrets
+              key: REDIS_PASSWORD
+        ports:
+        - containerPort: 6379
+        resources:
+          requests:
+            cpu: "50m"
+            memory: "128Mi"
+          limits:
+            cpu: "200m"
+            memory: "256Mi"
+        # Health check to ensure Redis is accepting connections
+        readinessProbe:
+          exec:
+            command: ["redis-cli", "-a", "$(REDIS_PASSWORD)", "ping"]
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          exec:
+            command: ["redis-cli", "-a", "$(REDIS_PASSWORD)", "ping"]
+          initialDelaySeconds: 10
+          periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kdc-store
+spec:
+  type: LoadBalancer
+  selector:
+    app: kdc-store
+  ports:
+    - protocol: TCP
+      port: 6379
+      targetPort: 6379

@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kerberos-tgs
+  labels:
+    app: kerberos-tgs
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kerberos-tgs
+  template:
+    metadata:
+      labels:
+        app: kerberos-tgs
+    spec:
+      containers:
+      - name: kerberos-tgs
+        image: kerberos-simulation-kerberos-tgs:latest # Built locally by docker-compose
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+        env:
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kerberos-secrets
+              key: REDIS_PASSWORD
+        - name: QUARKUS_REDIS_HOSTS
+          value: "redis://default:$(REDIS_PASSWORD)@kdc-store:6379"
+        - name: KDC_MASTER_KEY
+          valueFrom:
+            secretKeyRef:
+              name: kerberos-secrets
+              key: KDC_MASTER_KEY
+        - name: APP_SERVICE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: kerberos-secrets
+              key: APP_SERVICE_KEY
+        - name: MOCK_USER_NAME
+          value: "unused"
+        - name: MOCK_USER_KEY
+          value: "unused_placeholder_32bytes_long"
+        - name: PG_USER
+          valueFrom:
+            secretKeyRef:
+              name: kdc-db-secrets
+              key: PG_USER
+        - name: PG_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kdc-db-secrets
+              key: PG_PASSWORD
+        - name: PG_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: kdc-db-secrets
+              key: PG_DATABASE
+        - name: PG_HOST
+          value: "kdc-db"
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kerberos-tgs
+spec:
+  type: LoadBalancer
+  selector:
+    app: kerberos-tgs
+  ports:
+    - protocol: TCP
+      port: 8082
+      targetPort: 8080
